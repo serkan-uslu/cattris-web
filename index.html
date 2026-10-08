@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#e8c7ae" />
+    <meta name="description" content="Cattris — tatlı, animasyonlu kedilerle oynanan blok yerleştirme oyunu." />
+    <title>Cattris 🐾</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <canvas id="room" aria-hidden="true"></canvas>
+
+    <main class="layout">
+      <section class="side side-left">
+        <h1 class="logo" aria-label="Cattris">
+          <span class="ear ear-l"></span><span class="ear ear-r"></span>
+          <span class="letters"
+            ><span>C</span><span>A</span><span>T</span><span>T</span><span>R</span><span>I</span><span>S</span></span
+          >
+          <span class="paw paw-l"></span><span class="paw paw-r"></span>
+        </h1>
+
+        <button class="panel preview hold" id="hold-panel" type="button" aria-label="Hold">
+          <span class="panel-title">HOLD</span>
+          <span class="preview-well"><canvas id="hold"></canvas></span>
+        </button>
+
+        <div class="keys keys-left">
+          <button class="key" data-action="left" type="button"><span class="key-cap">⇦</span><span>LEFT</span></button>
+          <button class="key" data-action="right" type="button"><span class="key-cap">⇨</span><span>RIGHT</span></button>
+        </div>
+      </section>
+
+      <section class="board-wrap">
+        <div class="board-frame" id="board-frame">
+          <canvas id="board"></canvas>
+          <div class="popups" id="popups"></div>
+          <div class="overlay" id="overlay">
+            <div class="card" id="card"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="side side-right">
+        <div class="stat" id="stat-score">
+          <span class="stat-title">SCORE: <i class="ico ico-paw"></i></span>
+          <span class="stat-value" id="score">0</span>
+        </div>
+        <div class="stat" id="stat-level">
+          <span class="stat-title">LEVEL: <i class="ico ico-yarn"></i></span>
+          <span class="stat-value" id="level">01</span>
+        </div>
+        <div class="stat" id="stat-lines">
+          <span class="stat-title">LINES: <i class="ico ico-paw"></i></span>
+          <span class="stat-value" id="lines">0</span>
+        </div>
+
+        <div class="panel preview next">
+          <span class="panel-title">NEXT</span>
+          <span class="preview-well"><canvas id="next"></canvas></span>
+        </div>
+
+        <div class="keys keys-right">
+          <button class="key" data-action="down" type="button"><span class="key-cap">⇩</span><span>DOWN</span></button>
+          <button class="key" data-action="rotate" type="button"><span class="key-cap">⇧</span><span>UP</span></button>
+          <button class="key key-wide" data-action="drop" type="button"><span class="key-cap"></span><span>SPACE</span></button>
+        </div>
+
+        <div class="toggles">
+          <button class="toggle" id="btn-sfx" type="button" title="Ses efektleri">🔊</button>
+          <button class="toggle" id="btn-music" type="button" title="Müzik (M)">🎵</button>
+          <button class="toggle" id="btn-pause" type="button" title="Duraklat (P)">⏸</button>
+        </div>
+      </section>
+
+      <!-- Touch controls (shown on phones in portrait) -->
+      <nav class="touch-pad" aria-label="Kontroller">
+        <button class="pad" data-action="hold" type="button">HOLD</button>
+        <button class="pad" data-action="left" type="button">⇦</button>
+        <button class="pad" data-action="down" type="button">⇩</button>
+        <button class="pad" data-action="right" type="button">⇨</button>
+        <button class="pad" data-action="rotate" type="button">⟳</button>
+        <button class="pad pad-drop" data-action="drop" type="button">DROP</button>
+      </nav>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
