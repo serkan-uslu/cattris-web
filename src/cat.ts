@@ -1,6 +1,7 @@
 // Procedural cat drawing. A cat is a set of grid cells joined into one soft,
 // glossy tube with a face on the head cell and a wagging tail on the tail cell.
 
+import { drawShape } from './particles';
 import { DOWN, LEFT, RIGHT, UP, type CatLook, type CatPart } from './pieces';
 
 export interface CatCell {
@@ -11,7 +12,21 @@ export interface CatCell {
   part: CatPart;
 }
 
-export type Mood = 'normal' | 'happy' | 'squint' | 'sleep' | 'worried' | 'sad' | 'meow';
+export type Mood =
+  | 'normal'
+  | 'happy'
+  | 'squint'
+  | 'sleep'
+  | 'worried'
+  | 'sad'
+  | 'meow'
+  /** Hissing: ears back, fangs out, fur standing up. */
+  | 'angry'
+  /** Glaring with a frown, no hiss yet. */
+  | 'grumpy'
+  | 'love'
+  | 'dizzy'
+  | 'yawn';
 
 export interface CatStyle {
   look: CatLook;
@@ -27,6 +42,10 @@ export interface CatStyle {
   lookY?: number;
   /** Faster wagging (excited cat). */
   wagBoost?: number;
+  /** 0..1 — fur standing on end. */
+  puff?: number;
+  /** Fresh out of a fight: band-aid and messy tufts. */
+  scruffy?: boolean;
 }
 
 const EYE = '#2a1b2b';
@@ -52,11 +71,55 @@ function bodyPath(ctx: CanvasRenderingContext2D, cells: CatCell[], S: number, in
   }
 }
 
+/** Spiky fur sticking out of every free side of the cat (puffed up and angry). */
+function drawFur(ctx: CanvasRenderingContext2D, cells: CatCell[], st: CatStyle, puff: number): void {
+  const S = st.size;
+  const len = S * 0.2 * puff;
+  const teeth = 4;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(1, S * 0.04);
+  ctx.strokeStyle = st.look.outline;
+  ctx.fillStyle = st.look.dark;
+  const sides: [number, number, number][] = [
+    [UP, 0, -1],
+    [RIGHT, 1, 0],
+    [DOWN, 0, 1],
+    [LEFT, -1, 0],
+  ];
+  for (const c of cells) {
+    const cx = c.px + S / 2;
+    const cy = c.py + S / 2;
+    for (const [bit, nx, ny] of sides) {
+      if (c.conn & bit) continue;
+      if (bit === DOWN) continue; // nobody puffs their belly into the floor
+      ctx.beginPath();
+      const half = S * 0.38;
+      // Along the side: tangent (tx, ty), outward normal (nx, ny).
+      const tx = -ny;
+      const ty = nx;
+      const ex = cx + nx * S * 0.36;
+      const ey = cy + ny * S * 0.36;
+      ctx.moveTo(ex - tx * half, ey - ty * half);
+      for (let i = 0; i < teeth; i++) {
+        const a = -half + ((i + 0.5) / teeth) * half * 2;
+        const b = -half + ((i + 1) / teeth) * half * 2;
+        const wob = 1 + Math.sin(st.time * 30 + i + c.px) * 0.15;
+        ctx.lineTo(ex + tx * a + nx * len * wob, ey + ty * a + ny * len * wob);
+        ctx.lineTo(ex + tx * b, ey + ty * b);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+}
+
 export function drawCatBody(ctx: CanvasRenderingContext2D, cells: CatCell[], st: CatStyle): void {
   const S = st.size;
   const { look } = st;
   const ow = Math.max(1.2, S * 0.055);
   const base = S * 0.06;
+  if (st.puff && st.puff > 0.02) drawFur(ctx, cells, st, st.puff);
 
   ctx.fillStyle = look.outline;
   bodyPath(ctx, cells, S, base - ow);
@@ -190,9 +253,61 @@ function drawEyes(ctx: CanvasRenderingContext2D, S: number, st: CatStyle, mood: 
         break;
       case 'sleep':
       case 'sad':
+      case 'yawn':
         ctx.arc(x, ey - S * 0.01, S * 0.06, Math.PI * 0.15, Math.PI * 0.85);
         ctx.stroke();
         break;
+      case 'angry':
+      case 'grumpy': {
+        const angry = mood === 'angry';
+        ctx.ellipse(x + (st.lookX ?? 0) * S * 0.02, ey + S * 0.01, S * 0.066, S * 0.078, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Eyelid cut along a slanted brow: inner end low = cross cat.
+        const outer = x + side * S * 0.11;
+        const inner = x - side * S * 0.1;
+        const yo = ey - S * (angry ? 0.075 : 0.06);
+        const yi = ey + S * (angry ? 0.005 : -0.03);
+        ctx.beginPath();
+        ctx.fillStyle = st.look.body;
+        ctx.moveTo(outer, yo);
+        ctx.lineTo(inner, yi);
+        ctx.lineTo(inner, ey - S * 0.16);
+        ctx.lineTo(outer, ey - S * 0.16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(outer + side * S * 0.01, yo - S * 0.015);
+        ctx.lineTo(inner - side * S * 0.01, yi - S * 0.015);
+        ctx.stroke();
+        ctx.fillStyle = EYE;
+        break;
+      }
+      case 'love': {
+        ctx.save();
+        ctx.translate(x, ey + S * 0.03);
+        const pulse = 1 + Math.sin(st.time * 10 + side) * 0.12;
+        ctx.scale(pulse, pulse);
+        ctx.fillStyle = '#ff4f8b';
+        drawShape(ctx, 'heart', S * 0.105);
+        ctx.restore();
+        ctx.fillStyle = EYE;
+        break;
+      }
+      case 'dizzy': {
+        ctx.save();
+        ctx.translate(x, ey);
+        ctx.rotate(st.time * 9 * side);
+        ctx.beginPath();
+        for (let a = 0; a < Math.PI * 4; a += 0.35) {
+          const r = S * 0.0065 * a;
+          if (a === 0) ctx.moveTo(0, 0);
+          else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.lineWidth = lw * 0.75;
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
       case 'worried': {
         ctx.fillStyle = '#fff';
         ctx.ellipse(x, ey, S * 0.08, S * 0.095, 0, 0, Math.PI * 2);
@@ -249,7 +364,37 @@ function drawMouth(ctx: CanvasRenderingContext2D, S: number, look: CatLook, mood
   ctx.strokeStyle = look.outline;
   ctx.lineWidth = Math.max(1, S * 0.03);
   ctx.lineCap = 'round';
-  if (mood === 'meow' || mood === 'worried') {
+  if (mood === 'angry') {
+    // Hiss: wide open mouth with two little fangs.
+    ctx.beginPath();
+    ctx.fillStyle = '#6a1530';
+    ctx.moveTo(-S * 0.1, ny + S * 0.05);
+    ctx.quadraticCurveTo(0, ny + S * 0.025, S * 0.1, ny + S * 0.05);
+    ctx.quadraticCurveTo(S * 0.07, ny + S * 0.18, 0, ny + S * 0.18);
+    ctx.quadraticCurveTo(-S * 0.07, ny + S * 0.18, -S * 0.1, ny + S * 0.05);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * S * 0.075, ny + S * 0.045);
+      ctx.lineTo(side * S * 0.035, ny + S * 0.04);
+      ctx.lineTo(side * S * 0.058, ny + S * 0.1);
+      ctx.fill();
+    }
+  } else if (mood === 'grumpy') {
+    ctx.beginPath();
+    ctx.arc(0, ny + S * 0.12, S * 0.055, Math.PI * 1.2, Math.PI * 1.8);
+    ctx.stroke();
+  } else if (mood === 'yawn') {
+    ctx.beginPath();
+    ctx.fillStyle = '#7a2340';
+    ctx.ellipse(0, ny + S * 0.12, S * 0.07, S * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.fillStyle = '#ff8fb0';
+    ctx.ellipse(0, ny + S * 0.17, S * 0.045, S * 0.035, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (mood === 'meow' || mood === 'worried') {
     const open = mood === 'meow' ? 1 : 0.6;
     ctx.beginPath();
     ctx.fillStyle = '#7a2340';
@@ -296,6 +441,8 @@ export function drawCatHead(ctx: CanvasRenderingContext2D, cells: CatCell[], st:
   const hy = head.py + S / 2 + S * 0.02 + Math.sin(st.time * 2 + st.seed) * S * 0.012;
   const ow = Math.max(1.2, S * 0.055);
 
+  const earsBack = mood === 'angry' ? 1 : mood === 'grumpy' || mood === 'worried' ? 0.45 : 0;
+
   // Occasional ear twitch.
   const twitch = Math.pow(Math.max(0, Math.sin(st.time * 0.9 + st.seed * 7.3)), 40) * 0.35;
 
@@ -308,8 +455,8 @@ export function drawCatHead(ctx: CanvasRenderingContext2D, cells: CatCell[], st:
     const bx = side * S * 0.24;
     const by = -S * 0.25;
     ctx.save();
-    ctx.translate(bx, by);
-    if (side > 0) ctx.rotate(twitch);
+    ctx.translate(bx, by + earsBack * S * 0.08);
+    ctx.rotate(side * earsBack * 0.75 + (side > 0 ? twitch : 0));
     ctx.beginPath();
     ctx.moveTo(-side * S * 0.18 * k, S * 0.12 * k);
     ctx.lineTo(side * S * 0.02 * k, -S * 0.36 * k);
@@ -399,8 +546,21 @@ export function drawCatHead(ctx: CanvasRenderingContext2D, cells: CatCell[], st:
   ctx.stroke();
   ctx.globalAlpha /= 0.55;
 
+  if (st.scruffy) drawScruff(ctx, S, look);
+
   drawEyes(ctx, S, st, mood);
   drawMouth(ctx, S, look, mood);
+
+  if (mood === 'dizzy') {
+    for (let i = 0; i < 3; i++) {
+      const a = st.time * 4.5 + i * 2.094;
+      ctx.save();
+      ctx.translate(Math.cos(a) * S * 0.36, -S * 0.52 + Math.sin(a) * S * 0.1);
+      ctx.fillStyle = '#ffe066';
+      drawShape(ctx, 'star', S * 0.085);
+      ctx.restore();
+    }
+  }
 
   if (mood === 'sleep') {
     const t = (st.time * 0.6 + hash(st.seed)) % 1;
@@ -410,6 +570,47 @@ export function drawCatHead(ctx: CanvasRenderingContext2D, cells: CatCell[], st:
     ctx.fillText('z', S * 0.3 + t * S * 0.2, -S * 0.35 - t * S * 0.4);
   }
   ctx.restore();
+}
+
+/** Messy tufts and a band-aid after a fight. */
+function drawScruff(ctx: CanvasRenderingContext2D, S: number, look: CatLook): void {
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(1, S * 0.03);
+  ctx.strokeStyle = look.outline;
+  ctx.fillStyle = look.body;
+  ctx.beginPath();
+  ctx.moveTo(-S * 0.14, -S * 0.34);
+  ctx.lineTo(-S * 0.1, -S * 0.5);
+  ctx.lineTo(-S * 0.04, -S * 0.37);
+  ctx.lineTo(S * 0.02, -S * 0.52);
+  ctx.lineTo(S * 0.07, -S * 0.36);
+  ctx.lineTo(S * 0.13, -S * 0.46);
+  ctx.lineTo(S * 0.15, -S * 0.33);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.save();
+  ctx.translate(S * 0.22, -S * 0.2);
+  ctx.rotate(-0.65);
+  ctx.fillStyle = '#f7cfa3';
+  ctx.strokeStyle = '#b07a4f';
+  ctx.beginPath();
+  ctx.roundRect(-S * 0.14, -S * 0.048, S * 0.28, S * 0.096, S * 0.048);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#e3a877';
+  ctx.fillRect(-S * 0.04, -S * 0.038, S * 0.08, S * 0.076);
+  ctx.restore();
+
+  // Scratch marks on the cheek.
+  ctx.strokeStyle = 'rgba(200, 40, 70, 0.7)';
+  ctx.lineWidth = Math.max(1, S * 0.02);
+  ctx.beginPath();
+  for (let i = 0; i < 3; i++) {
+    ctx.moveTo(-S * (0.36 - i * 0.04), -S * 0.08);
+    ctx.lineTo(-S * (0.3 - i * 0.04), S * 0.0);
+  }
+  ctx.stroke();
 }
 
 function drawPaws(ctx: CanvasRenderingContext2D, x: number, y: number, S: number, look: CatLook): void {

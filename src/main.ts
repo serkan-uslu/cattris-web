@@ -1,10 +1,11 @@
 import './style.css';
 import { Sound } from './audio';
 import { RoomBackground } from './background';
-import { COLS, Game, type GameEvent } from './game';
+import { COLS, Game, HIDDEN_ROWS, type GameEvent } from './game';
 import { Particles } from './particles';
 import { LOOKS, type PieceType } from './pieces';
-import { BoardRenderer, drawPreview } from './render';
+import { BoardRenderer, drawPortrait, drawPreview } from './render';
+import { CatSocial, PROFILES, RIVALS } from './social';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -13,6 +14,28 @@ const sound = new Sound();
 const particles = new Particles();
 const renderer = new BoardRenderer($<HTMLCanvasElement>('board'));
 const room = new RoomBackground($<HTMLCanvasElement>('room'));
+const social = new CatSocial({
+  hiss: (loud) => sound.hiss(loud),
+  growl: () => sound.growl(),
+  fight: () => sound.fight(),
+  purr: () => sound.purr(0.7),
+  chirp: () => sound.chirp(),
+  popup: (text, cls, delay) => popup(text, cls, delay),
+  shake: () => shake('hard'),
+  hearts: (x, y, count) => {
+    const S = renderer.cell;
+    for (let i = 0; i < count; i++) {
+      particles.emit('heart', x * S, (y - HIDDEN_ROWS) * S, {
+        color: i % 2 ? '#ff6fae' : '#ff9fcb',
+        size: S * (0.14 + Math.random() * 0.08),
+        vy: -70 - Math.random() * 50,
+        gravity: -20,
+        spread: 0.8,
+        maxLife: 1 + Math.random() * 0.5,
+      });
+    }
+  },
+});
 
 const frame = $('board-frame');
 const overlay = $('overlay');
@@ -20,6 +43,8 @@ const card = $('card');
 const popups = $('popups');
 const holdCanvas = $<HTMLCanvasElement>('hold');
 const nextCanvas = $<HTMLCanvasElement>('next');
+const nextName = $('next-name');
+const holdName = $('hold-name');
 const scoreEl = $('score');
 const levelEl = $('level');
 const linesEl = $('lines');
@@ -81,15 +106,46 @@ const controlsHelp = `
     <li><kbd>P</kbd> Duraklat · <kbd>M</kbd> Müzik</li>
   </ul>`;
 
+const rulesHelp = `
+  <ul class="rules">
+    <li><b class="r-love">♥ Dostluk:</b> Aynı renk kediler yan yana gelince sevişir — bonus puan!</li>
+    <li><b class="r-hiss">😾 Düşmanlık:</b> Düşman kediler birbirine hırlar. İyice sıkışırlarsa <b>KAVGA</b> çıkar — kavga bonusu!</li>
+    <li><b class="r-pet">🖐 Sev:</b> Kedilere tıkla, mırlasınlar. Ama komşusu kıskanabilir…</li>
+  </ul>`;
+
 function showMenu(): void {
   showCard(`
     <div class="card-cat">😺</div>
     <h2>Kediler uyuyor…</h2>
-    <p>Kedileri yan yana diz, sıraları tamamla, mutlu mırıltıları dinle!</p>
+    <p>Kedileri diz, sıraları tamamla. Ama dikkat: bu kedilerin huyu suyu var!</p>
     <button class="btn" data-cmd="start" type="button">Oyna</button>
+    <button class="btn btn-ghost" data-cmd="guide" type="button">Kedileri tanı 🐾</button>
     ${best ? `<p class="best">En iyi skor: <b>${best.toLocaleString('en-US')}</b></p>` : ''}
+    ${rulesHelp}
     ${controlsHelp}
     <p class="touch-hint">Telefonda: dokun = döndür · kaydır = hareket · aşağı fırlat = bırak</p>
+  `);
+}
+
+function showGuide(): void {
+  const order: PieceType[] = ['J', 'Z', 'L', 'T', 'S', 'I', 'O'];
+  const rows = order
+    .map((t) => {
+      const p = PROFILES[t];
+      const rivals = RIVALS[t].map((r) => `<span style="color:${LOOKS[r].dark}">${PROFILES[r].name}</span>`).join(', ');
+      return `<li>
+        <canvas class="portrait" data-type="${t}"></canvas>
+        <div><b style="color:${LOOKS[t].dark}">${p.name}</b> <span class="trait">${p.trait}</span>
+        <span class="enemy">😾 Düşmanı: ${rivals}</span></div>
+      </li>`;
+    })
+    .join('');
+  showCard(`
+    <h2>Kedi Rehberi</h2>
+    <p>Aynı kediden ikisi yan yana gelince <b class="r-love">dost</b> olur. Düşmanlar yan yana gelince <b class="r-hiss">hırlar</b> ya da <b class="r-hiss">kavga</b> eder!</p>
+    <ul class="guide">${rows}</ul>
+    <button class="btn" data-cmd="start" type="button">Oyna</button>
+    <button class="btn btn-ghost" data-cmd="menu" type="button">Geri</button>
   `);
 }
 
@@ -110,6 +166,7 @@ function showGameOver(): void {
     <h2>Oyun bitti!</h2>
     <p class="final">${game.score.toLocaleString('en-US')}</p>
     <p>Seviye ${game.level} · ${game.lines} sıra</p>
+    <p class="drama">😾 ${social.fights} kavga · ♥ ${social.friendships} dostluk</p>
     ${isBest ? '<p class="best new">✨ Yeni rekor! ✨</p>' : `<p class="best">En iyi skor: <b>${best.toLocaleString('en-US')}</b></p>`}
     <button class="btn" data-cmd="start" type="button">Tekrar oyna</button>
   `);
@@ -123,6 +180,8 @@ card.addEventListener('click', (e) => {
   const cmd = btn.dataset.cmd;
   if (cmd === 'start' || cmd === 'restart') startGame();
   else if (cmd === 'resume') togglePause();
+  else if (cmd === 'guide') showGuide();
+  else if (cmd === 'menu') showMenu();
 });
 
 // ------------------------------------------------------------------ flow
@@ -134,6 +193,7 @@ const DEMO: [PieceType, number, number][] = [
 function napPile(): void {
   game.reset();
   renderer.forget();
+  social.reset();
   for (const [t, r, x] of DEMO) game.placeStatic(t, r, x);
   game.drainEvents();
 }
@@ -143,6 +203,7 @@ function startGame(): void {
   hideCard();
   renderer.forget();
   particles.update(10_000);
+  social.reset();
   game.start(1);
   displayedScore = 0;
   sound.setTempo(1);
@@ -342,6 +403,23 @@ const endTouch = (e: PointerEvent) => {
 frame.addEventListener('pointerup', endTouch);
 frame.addEventListener('pointercancel', () => (touch = null));
 
+// Petting: click (or tap while the game isn't running) on a cat.
+function petAt(clientX: number, clientY: number): boolean {
+  const rect = renderer.canvas.getBoundingClientRect();
+  const { x, y } = renderer.cellAt(clientX - rect.left, clientY - rect.top);
+  const cell = game.board[y]?.[x];
+  if (!cell) return false;
+  sound.unlock();
+  social.pet(game, cell.pid, time);
+  return true;
+}
+frame.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && !(e.target as HTMLElement).closest('.overlay.show')) petAt(e.clientX, e.clientY);
+});
+overlay.addEventListener('pointerdown', (e) => {
+  if (e.target === overlay) petAt(e.clientX, e.clientY);
+});
+
 // Toggles
 const sfxBtn = $('btn-sfx');
 const musicBtn = $('btn-music');
@@ -441,6 +519,7 @@ function handle(ev: GameEvent): void {
       renderer.landed(ev.pid, time);
       if (lastHardDrop) renderer.meow(ev.pid, time + 0.6);
       else sound.land();
+      if (social.onLand(game, ev.pid, ev.piece, time, lastHardDrop) > 0) bump('stat-score');
       lastHardDrop = false;
       const bottoms = new Map<number, number>();
       for (const c of ev.cells) bottoms.set(c.x, Math.max(bottoms.get(c.x) ?? -1, c.y));
@@ -511,6 +590,7 @@ function handle(ev: GameEvent): void {
       break;
     case 'gameOver': {
       sound.gameOver();
+      social.onGameOver(game, time);
       sound.stopMusic();
       releaseAll();
       if (game.score > best) {
@@ -521,7 +601,7 @@ function handle(ev: GameEvent): void {
           /* ignore */
         }
       }
-      setTimeout(showGameOver, 1300);
+      setTimeout(showGameOver, 2100);
       break;
     }
     case 'spawn':
@@ -541,6 +621,10 @@ function updateHud(dt: number): void {
   levelEl.textContent = String(game.level).padStart(2, '0');
   linesEl.textContent = String(game.lines);
   frame.classList.toggle('danger', game.state === 'playing' && game.stackHeight > 0.7);
+}
+
+function setText(el: HTMLElement, text: string): void {
+  if (el.textContent !== text) el.textContent = text;
 }
 
 function tick(dir: number, dt: number): void {
@@ -564,14 +648,20 @@ function loop(now: number): void {
   for (const ev of game.drainEvents()) handle(ev);
   particles.update(dt);
 
+  social.update(game, dt, time);
+
   room.render(time);
-  renderer.render(game, particles, time);
+  renderer.render(game, particles, time, social);
+  const next = game.state === 'ready' ? 'T' : game.nextPiece;
   drawPreview(holdCanvas, game.holdPiece, time, { dim: !game.canHold });
-  drawPreview(nextCanvas, game.state === 'ready' ? 'T' : game.nextPiece, time);
+  drawPreview(nextCanvas, next, time);
+  setText(nextName, PROFILES[next].name);
+  setText(holdName, game.holdPiece ? PROFILES[game.holdPiece].name : '');
+  for (const c of card.querySelectorAll<HTMLCanvasElement>('canvas.portrait')) drawPortrait(c, c.dataset.type as PieceType, time);
   updateHud(dt);
 
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-if (import.meta.env.DEV) Object.assign(window, { cattris: game });
+if (import.meta.env.DEV) Object.assign(window, { cattris: game, social });

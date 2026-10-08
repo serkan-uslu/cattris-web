@@ -435,6 +435,60 @@ button.panel {
   to { background-position: 200% 0; }
 }
 
+.popup.fight {
+  top: 30%;
+  font-size: calc(var(--u) * 6.6);
+  color: #ffdf4a;
+  -webkit-text-stroke-color: #b3261e;
+  text-shadow:
+    0 calc(var(--u) * 0.6) 0 #6e1410,
+    0 0 calc(var(--u) * 2) rgba(255, 80, 40, 0.8);
+  animation:
+    pop 1.6s cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    rumble 0.08s linear infinite;
+}
+.popup.fight-points {
+  top: 39%;
+  color: #ffb36b;
+  -webkit-text-stroke-color: #8a2a0c;
+}
+.popup.friend {
+  top: 47%;
+  font-size: calc(var(--u) * 4.2);
+  color: #ffd1e6;
+  -webkit-text-stroke-color: #c2407f;
+}
+.popup.hiss {
+  top: 47%;
+  font-size: calc(var(--u) * 4.2);
+  color: #ffe0b8;
+  -webkit-text-stroke-color: #c0392b;
+}
+@keyframes rumble {
+  0% { margin-left: -2px; margin-top: 1px; }
+  50% { margin-left: 2px; margin-top: -1px; }
+  100% { margin-left: -1px; margin-top: 0; }
+}
+
+.cat-name {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--u) * 1.9);
+  transform: translateX(-50%);
+  padding: 0 calc(var(--u) * 1.2);
+  border-radius: calc(var(--u) * 2);
+  background: rgba(255, 243, 226, 0.92);
+  color: var(--ink);
+  font-size: calc(var(--u) * 2.2);
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.cat-name:empty {
+  display: none;
+}
+
 /* ------------------------------------------------------------ overlay */
 
 .overlay {
@@ -558,6 +612,55 @@ kbd {
 .touch-hint {
   display: none;
 }
+.rules {
+  list-style: none;
+  margin: calc(var(--u) * 1.4) 0 0;
+  padding: calc(var(--u) * 1.2) 0 0;
+  border-top: 2px dashed #f2c3d6;
+  text-align: left;
+  font-size: max(11px, calc(var(--u) * 2.1));
+  line-height: 1.35;
+}
+.rules li + li {
+  margin-top: calc(var(--u) * 0.8);
+}
+.r-love { color: #d63d7f; }
+.r-hiss { color: #c0392b; }
+.r-pet { color: #8a4a12; }
+.card .drama {
+  font-weight: 700;
+  color: #8a4a12;
+}
+.guide {
+  list-style: none;
+  margin: calc(var(--u) * 1) 0;
+  padding: 0;
+  text-align: left;
+  font-size: max(11px, calc(var(--u) * 2.1));
+  line-height: 1.3;
+}
+.guide li {
+  display: flex;
+  gap: calc(var(--u) * 1.2);
+  align-items: center;
+  padding: calc(var(--u) * 0.6) 0;
+  border-bottom: 1px dashed #f2c3d6;
+}
+.guide .portrait {
+  flex: none;
+  width: max(40px, calc(var(--u) * 7));
+  height: max(40px, calc(var(--u) * 7));
+}
+.guide .trait {
+  display: block;
+  font-weight: 500;
+}
+.guide .enemy {
+  display: block;
+  font-weight: 600;
+  color: #8a4a12;
+}
+
 
 /* ------------------------------------------------------------ keys */
 
@@ -763,8 +866,15 @@ body.portrait .popup {
   font-size: 30px;
 }
 body.portrait .popup.points,
-body.portrait .popup.combo {
-  font-size: 22px;
+body.portrait .popup.combo,
+body.portrait .popup.friend,
+body.portrait .popup.hiss {
+  font-size: 20px;
+}
+body.portrait .cat-name {
+  bottom: 7px;
+  font-size: 9px;
+  padding: 0 5px;
 }
 
 body.portrait .touch-pad {

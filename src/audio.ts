@@ -183,6 +183,84 @@ export class Sound {
     lfo.stop(t + dur + 0.05);
   }
 
+  /** Cat hiss: a breathy burst of high-passed noise. */
+  hiss(loud = true, at = 0): void {
+    if (!this.ready || !this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + at;
+    const dur = loud ? 0.55 : 0.4;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 2500;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'peaking';
+    bp.frequency.setValueAtTime(4200, t);
+    bp.frequency.linearRampToValueAtTime(6000, t + dur);
+    bp.gain.value = 9;
+    const g = ctx.createGain();
+    const peak = loud ? 0.42 : 0.2;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.025);
+    g.gain.setValueAtTime(peak * 0.85, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(hp).connect(bp).connect(g).connect(this.sfx);
+    src.start(t, Math.random() * 0.4);
+    src.stop(t + dur + 0.05);
+  }
+
+  /** Low throaty growl. */
+  growl(at = 0, dur = 0.7): void {
+    if (!this.ready || !this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + at;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.linearRampToValueAtTime(150, t + dur * 0.5);
+    o.frequency.linearRampToValueAtTime(95, t + dur);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 700;
+    lp.Q.value = 4;
+    const trem = ctx.createGain();
+    trem.gain.value = 0.6;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 19;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.4;
+    lfo.connect(lfoGain).connect(trem.gain);
+    const g = ctx.createGain();
+    this.env(g, t, 0.3, 0.06, dur);
+    o.connect(lp).connect(trem).connect(g).connect(this.sfx);
+    o.start(t);
+    lfo.start(t);
+    o.stop(t + dur + 0.05);
+    lfo.stop(t + dur + 0.05);
+  }
+
+  /** A cartoon cat fight: yowls, hisses, scratches and thumps. */
+  fight(): void {
+    if (!this.ready) return;
+    this.meow(0.7, 0.7, 0, 0.3);
+    this.growl(0.05, 1.1);
+    this.hiss(true, 0.1);
+    for (let i = 0; i < 9; i++) {
+      const at = 0.15 + i * 0.11 + Math.random() * 0.05;
+      if (i % 3 === 0) this.meow(0.9 + Math.random() * 0.9, 0.16 + Math.random() * 0.12, at, 0.2);
+      else this.noiseBurst(0.05, 2500 + Math.random() * 2500, 2, 0.25, at);
+      if (i % 2 === 0) this.tone(140, 0.09, 'sine', 0.25, at, 50);
+    }
+    this.hiss(false, 1.05);
+  }
+
+  /** Short happy "mrrp?" chirp. */
+  chirp(): void {
+    if (!this.ready) return;
+    this.meow(1.55 + Math.random() * 0.2, 0.17, 0, 0.16);
+  }
+
   move(): void {
     if (!this.ready) return;
     this.tone(880, 0.05, 'sine', 0.08, 0, 620);
